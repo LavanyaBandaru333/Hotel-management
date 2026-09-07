@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, Lock, Phone, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { API_URL, safeFetchJson } from '../utils/api';
 
 export const Register = ({ setActivePage, setAuthUser }) => {
   const [name, setName] = useState('');
@@ -15,15 +16,13 @@ export const Register = ({ setActivePage, setAuthUser }) => {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/register`, {
+      const { ok, data } = await safeFetchJson(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, phone, password }),
       });
       
-      const data = await res.json();
-      
-      if (data.success) {
+      if (ok && data.success) {
         toast.success(`Account created successfully! Welcome, ${data.name}!`);
         localStorage.setItem('userInfo', JSON.stringify(data));
         if (setAuthUser) setAuthUser(data);
@@ -32,7 +31,7 @@ export const Register = ({ setActivePage, setAuthUser }) => {
         toast.error(data.message || 'Error creating account');
       }
     } catch (error) {
-      toast.error('Network error. Please try again.');
+      toast.error('Network error. Please check your connection.');
     } finally {
       setIsLoading(false);
     }

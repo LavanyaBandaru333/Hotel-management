@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { API_URL, safeFetchJson } from '../utils/api';
 
 export const Login = ({ setActivePage, setAuthUser }) => {
   const [email, setEmail] = useState('');
@@ -13,15 +14,13 @@ export const Login = ({ setActivePage, setAuthUser }) => {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+      const { ok, data } = await safeFetchJson(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
       
-      const data = await res.json();
-      
-      if (data.success) {
+      if (ok && data.success) {
         toast.success(`Welcome back, ${data.name}!`);
         localStorage.setItem('userInfo', JSON.stringify(data));
         if (setAuthUser) setAuthUser(data);
@@ -30,7 +29,7 @@ export const Login = ({ setActivePage, setAuthUser }) => {
         toast.error(data.message || 'Invalid email or password');
       }
     } catch (error) {
-      toast.error('Network error. Please try again.');
+      toast.error('Network error. Please check your connection.');
     } finally {
       setIsLoading(false);
     }

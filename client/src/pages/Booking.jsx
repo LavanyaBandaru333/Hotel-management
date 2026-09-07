@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Calendar, Users, Hotel, ChevronRight, Award } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { API_URL, safeFetchJson } from '../utils/api';
 
 // Import local assets
 import roomDeluxeImg from '../assets/room_deluxe.jpg';
@@ -58,7 +59,7 @@ export const Booking = ({ bookingState, setBookingState, authUser, setActivePage
         status: 'Pending'
       };
       
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/bookings`, {
+      const { ok, data } = await safeFetchJson(`${API_URL}/bookings`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -66,15 +67,14 @@ export const Booking = ({ bookingState, setBookingState, authUser, setActivePage
         },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if(data.success) {
+      if(ok && data.success) {
         toast.success("Reservation successful!");
         // Immediately redirect to the user's dashboard to see the booking
         setTimeout(() => {
           if(setActivePage) setActivePage('dashboard');
         }, 1000); // Small delay to let the toast show
       } else {
-        toast.error("Booking failed: " + data.message);
+        toast.error("Booking failed: " + (data.message || 'Unknown error'));
       }
     } catch (err) {
       console.error(err);

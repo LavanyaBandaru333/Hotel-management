@@ -8,10 +8,15 @@ import diningRoutes from "./routes/diningRoutes.js";
 import spaRoutes from "./routes/spaRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load .env only for local/dev when no environment-provided vars exist
 if (process.env.NODE_ENV !== 'production') {
-  dotenv.config();
+  dotenv.config({ path: path.join(__dirname, '.env') });
 }
 
 const app = express();
@@ -20,19 +25,30 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 const start = async () => {
-  // Prefer a Render-provided variable if you set it (avoids repo .env collisions)
   const rawEnv = process.env.RENDER_MONGO_URI || process.env.MONGO_URI || '';
-  const MONGO_URI = rawEnv && rawEnv.trim().length > 0 ? rawEnv.trim() : undefined;
-
-  if (!MONGO_URI || !(MONGO_URI.startsWith("mongodb://") || MONGO_URI.startsWith("mongodb+srv://"))) {
-    console.error("Missing or invalid MONGO_URI. Set a valid connection string in Render as RENDER_MONGO_URI or MONGO_URI.");
-    console.error("Example format: mongodb+srv://<user>:<password>@cluster0.px82pqe.mongodb.net/<dbname>?retryWrites=true&w=majority");
-    process.exit(1);
-  }
+  let MONGO_URI = rawEnv && rawEnv.trim().length > 0 ? rawEnv.trim() : undefined;
 
   try {
-    await mongoose.connect(process.env.RENDER_MONGO_URI, {});
-    console.log("✅ MongoDB Connected");
+    if (MONGO_URI && (MONGO_URI.startsWith("mongodb://") || MONGO_URI.startsWith("mongodb+srv://"))) {
+      try {
+        await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 4000 });
+        console.log("✅ Primary MongoDB Connected");
+      } catch (primaryErr) {
+        console.warn("⚠️ Primary MongoDB connection failed. Falling back to in-memory MongoDB server...", primaryErr.message);
+        const { MongoMemoryServer } = await import('mongodb-memory-server');
+        const mongod = await MongoMemoryServer.create();
+        MONGO_URI = mongod.getUri();
+        await mongoose.connect(MONGO_URI);
+        console.log("✅ In-Memory MongoDB Started & Connected");
+      }
+    } else {
+      console.warn("⚠️ No MONGO_URI specified. Starting in-memory MongoDB server...");
+      const { MongoMemoryServer } = await import('mongodb-memory-server');
+      const mongod = await MongoMemoryServer.create();
+      MONGO_URI = mongod.getUri();
+      await mongoose.connect(MONGO_URI);
+      console.log("✅ In-Memory MongoDB Started & Connected");
+    }
 
     // register routes after DB is connected
     app.use("/api/rooms", roomRoutes);
@@ -44,6 +60,15 @@ const start = async () => {
 
     app.get("/", (req, res) => res.send("Hotel API is running!"));
     app.get("/api", (req, res) => res.send("Hotel API is running!"));
+
+    // Global JSON error handling middleware
+    app.use((err, req, res, next) => {
+      console.error("Server Error:", err);
+      res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal Server Error'
+      });
+    });
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

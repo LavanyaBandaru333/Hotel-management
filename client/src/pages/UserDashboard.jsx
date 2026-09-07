@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { InvoicePDF } from '../components/InvoicePDF';
+import { API_URL, safeFetchJson } from '../utils/api';
 
 export const UserDashboard = ({ authUser, setAuthUser, setActivePage }) => {
   const [bookings, setBookings] = useState([]);
@@ -19,17 +20,16 @@ export const UserDashboard = ({ authUser, setAuthUser, setActivePage }) => {
       if (!authUser?.token) return;
       
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/bookings/mybookings`, {
+        const { ok, data } = await safeFetchJson(`${API_URL}/bookings/mybookings`, {
           headers: {
             'Authorization': `Bearer ${authUser.token}`
           }
         });
         
-        const data = await res.json();
-        if (Array.isArray(data)) {
+        if (ok && Array.isArray(data)) {
           setBookings(data);
         } else {
-          toast.error("Failed to fetch bookings");
+          toast.error((data && data.message) || "Failed to fetch bookings");
         }
       } catch (error) {
         toast.error("Network error fetching bookings");
